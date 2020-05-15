@@ -289,7 +289,7 @@ private extension RTCClient {
         let peerConnection = self.connectionFactory.peerConnection(with: configuration,
                                                                    constraints: self.callConstraint,
                                                                    delegate: self)
-        peerConnection.setBweMinBitrateBps(self.maxBitrate, currentBitrateBps: self.minBitrate, maxBitrateBps: self.maxBitrate)
+        peerConnection.setBweMinBitrateBps(NSNumber(value: self.maxBitrate), currentBitrateBps: NSNumber(value: self.minBitrate), maxBitrateBps: NSNumber(value: self.maxBitrate))
         return peerConnection
         // self.peerConnections
 
