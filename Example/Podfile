@@ -1,5 +1,5 @@
 use_frameworks!
-
+#enable_bitcode_for_prebuilt_frameworks!
 target 'OMGJanusWebRTC_Example' do
   pod 'OMGJanusWebRTC', :path => '../'
 

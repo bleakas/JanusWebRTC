@@ -48,7 +48,7 @@ public class RTCClient: NSObject {
                 "OfferToReceiveAudio": kRTCMediaConstraintsValueTrue,
                 "OfferToReceiveVideo": kRTCMediaConstraintsValueTrue])
     fileprivate var mediaConstraint: RTCMediaConstraints {
-        let constraints = [kRTCMediaConstraintsMinAspectRatio:"1.77777777"]// kRTCMediaConstraintsMaxWidth : "360", kRTCMediaConstraintsMaxHeight: "640",
+        let constraints = [kRTCMediaConstraintsMinAspectRatio:"1", "minFrameRate": "30", "maxFrameRate": "60"]// kRTCMediaConstraintsMaxWidth : "360", kRTCMediaConstraintsMaxHeight: "640",
         return RTCMediaConstraints(mandatoryConstraints: constraints, optionalConstraints: nil)
     }
 
@@ -274,6 +274,7 @@ private extension RTCClient {
 
     func initialisePeerConnectionFactory () {
         RTCPeerConnectionFactory.initialize()
+        
         self.connectionFactory = RTCPeerConnectionFactory()
     }
 
@@ -281,10 +282,13 @@ private extension RTCClient {
      
         let configuration = RTCConfiguration()
         configuration.iceServers = self.iceServers[id] ?? (defaultIceServer ?? [])
-        return self.connectionFactory.peerConnection(with: configuration,
-                                                                    constraints: self.callConstraint,
-                                                                    delegate: self)
-//        self.peerConnection?.setBweMinBitrateBps(0, currentBitrateBps: 0, maxBitrateBps: 500)
+        let peerConnection = self.connectionFactory.peerConnection(with: configuration,
+        constraints: self.callConstraint,
+        delegate: self)
+         peerConnection.setBweMinBitrateBps(400, currentBitrateBps: 0, maxBitrateBps: 500)
+        return peerConnection
+       // self.peerConnections
+           
     }
 
     func handleSdpGenerated(_ id:String,sdpDescription: RTCSessionDescription?) {
