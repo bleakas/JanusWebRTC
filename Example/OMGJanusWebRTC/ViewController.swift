@@ -46,7 +46,7 @@ class ViewController: UIViewController ,OMGRTCClientDelegate,RTCEAGLVideoViewDel
         
         var iceServers = [RTCIceServer]()
         //            iceServers.append(RTCIceServer(urlStrings: iceServerdata.urls, username: iceServerdata.username, credential: iceServerdata.credential))
-      //  iceServers.append(RTCIceServer(urlStrings:["stun:stun.l.google.com:19302"] ))
+        iceServers.append(RTCIceServer(urlStrings:["stun:stun.l.google.com:19302"] ))
         let n = Int(arc4random_uniform(11142))
         let myId = String(n)
         rtcManager = RTCClient(videoCall: true)
@@ -56,7 +56,7 @@ class ViewController: UIViewController ,OMGRTCClientDelegate,RTCEAGLVideoViewDel
 //        clientServer?.initPublish = false
         rtcOperator = WebRTCOperator(delegate: self,omgSocket: clientServer!)
         rtcManager?.delegate = rtcOperator
-        clientServer?.registerMeetRoom(1234)
+        clientServer?.registerMeetRoom(999)
         
         
         

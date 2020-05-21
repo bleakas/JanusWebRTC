@@ -9,308 +9,291 @@
 import Foundation
 
 public protocol CommandDelegate: class {
-    func receive(strData:String)
-    func getSendData()->String
+    func receive(strData: String)
+    func getSendData() -> String
 }
 
-public class BaseCommand:CommandDelegate
-{
-    var time:TimeInterval
-    var transaction:String
-    var delegate:RTCVideoServer
-    var handle_id:Int64
-    var preData:Codable?
-    public init(delegate:RTCVideoServer,handleId:Int64,data:Codable? = nil) {
-        self.transaction = UUID.init().uuidString
+public class BaseCommand: CommandDelegate {
+    var time: TimeInterval
+    var transaction: String
+    var delegate: RTCVideoServer
+    var handle_id: Int64
+    var preData: Codable?
+    public init(delegate: RTCVideoServer, handleId: Int64, data: Codable? = nil) {
+        self.transaction = UUID().uuidString
         self.delegate = delegate
         self.handle_id = handleId
         self.preData = data
         self.time = Date().timeIntervalSince1970
     }
     
-    final public func getSendData() -> String {
+    public final func getSendData() -> String {
         var sendData = ""
         do {
-            let jsonData = try JSONSerialization.data(withJSONObject: getDataObject(),options: .prettyPrinted)
+            let jsonData = try JSONSerialization.data(withJSONObject: getDataObject(), options: .prettyPrinted)
             sendData = String(data: jsonData, encoding: String.Encoding.utf8)!
 //            print("sendData: \(sendData)")
-        } catch let error {
+        } catch {
             print("error converting to json: \(error)")
         }
         return sendData
     }
     
-    func getDataObject()->[String : Any]{return [:]}
+    func getDataObject() -> [String: Any] { [:] }
     
     public func receive(strData str: String) {}
 }
 
+class CreateRoomCommand: BaseCommand {
+    var roomId: Int64
+    init(roomId: Int64, delegate: RTCVideoServer, handleId: Int64, data: Codable? = nil) {
+        self.roomId = roomId
+        super.init(delegate: delegate, handleId: handleId, data: data)
+        
+    }
+    
+    override func getDataObject() -> [String: Any] {
+        return ["janus": "create", "transaction": transaction, "message": ["request": "create", "room": roomId, "is_private": false]] as [String: Any]
+    }
+    
+}
 
-class CreateCommand:BaseCommand
-{
+class CreateCommand: BaseCommand {
     override func receive(strData: String) {
         do {
-            let data:CreateData = try JSONDecoder().decode(CreateData.self, from: strData.data(using: .utf8)!)
-            delegate.setSessionId( data.data.id)
+            let data: CreateData = try JSONDecoder().decode(CreateData.self, from: strData.data(using: .utf8)!)
+            delegate.setSessionId(data.data.id)
+            delegate.sendCommand(command: CreateRoomCommand(roomId: delegate.roomId, delegate: delegate, handleId: 0))
             delegate.sendCommand(command: AttachCommand(delegate: delegate, handleId: 0))
             
-        }catch let error {
+        } catch {
             print("error converting to json: \(error)")
         }
     }
     
-    override func getDataObject() -> [String : Any] {
-        return ["janus": "create", "transaction":transaction] as [String : Any]
+    override func getDataObject() -> [String: Any] {
+        return ["janus": "create", "transaction": transaction] as [String: Any]
     }
 }
 
-
-class AttachCommand:BaseCommand
-{
+class AttachCommand: BaseCommand {
     override func receive(strData: String) {
         do {
-            let data:AttachData = try JSONDecoder().decode(AttachData.self, from: strData.data(using: .utf8)!)
+            let data: AttachData = try JSONDecoder().decode(AttachData.self, from: strData.data(using: .utf8)!)
             handle_id = data.data.id
             
-            if(delegate.type == .Listparticipants){
+            if delegate.type == .Listparticipants {
                 delegate.sendCommand(command: ListparticipantsCommand(delegate: delegate, handleId: handle_id))
-            }else{
-                if(preData == nil){
+            } else {
+                if preData == nil {
                     delegate.sendCommand(command: JoinForPublisherCommand(delegate: delegate, handleId: handle_id))
-                }else{
-                    delegate.sendCommand(command: JoinForSubscriberCommand(delegate: delegate, handleId: handle_id,data:preData))
+                } else {
+                    delegate.sendCommand(command: JoinForSubscriberCommand(delegate: delegate, handleId: handle_id, data: preData))
                 }
             }
-        }catch let error {
+        } catch {
             print("error converting to json: \(error)")
         }
     }
     
-    override func getDataObject() -> [String : Any] {
-        return ["janus": "attach", "transaction":transaction, "session_id":delegate.session_id,"plugin":"janus.plugin.videoroom","opaque_id":"videoroomtest-"
-            ] as [String : Any]
+    override func getDataObject() -> [String: Any] {
+        return ["janus": "attach", "transaction": transaction, "session_id": delegate.session_id, "plugin": "janus.plugin.videoroom", "opaque_id": "videoroomtest-"] as [String: Any]
     }
 }
 
-class JoinForPublisherCommand:BaseCommand
-{
+class JoinForPublisherCommand: BaseCommand {
     override func receive(strData: String) {
         do {
-            if strData.contains("event")
-            {
-                let data:JoinData = try JSONDecoder().decode(JoinData.self, from: strData.data(using: .utf8)!)
+            if strData.contains("event") {
+                let data: JoinData = try JSONDecoder().decode(JoinData.self, from: strData.data(using: .utf8)!)
                 let id = String(data.plugindata.data.id ?? 0)
                 
                 delegate.myJanusId = id
                 delegate.janusId_id_to_handle[delegate.myJanusId] = handle_id
                 
-                if(delegate.initPublish){
+                if delegate.initPublish {
                     delegate.client?.startConnection(id, localStream: true)
                     delegate.client?.makeOffer(id)
                 }
                 
                 delegate.private_id = data.plugindata.data.private_id!
                 var index = 0
-                for publisher in data.plugindata.data.publishers
-                {
+                for publisher in data.plugindata.data.publishers {
                     if index == delegate.maxViewer {
                         return
                     }
                     delegate.info_from_janusId[publisher.id] = publisher
-                    delegate.sendCommand(command: AttachCommand(delegate: delegate, handleId: handle_id,data:AttachId(id: publisher.id)))
+                    delegate.sendCommand(command: AttachCommand(delegate: delegate, handleId: handle_id, data: AttachId(id: publisher.id)))
                     index += 1
                 }
             }
-        }catch let error {
+        } catch {
             print("error converting to json: \(error)")
         }
     }
     
-    override func getDataObject() -> [String : Any] {
+    override func getDataObject() -> [String: Any] {
         
-        return ["janus": "message", "transaction":transaction, "session_id":delegate.session_id,"handle_id":handle_id,"body":["display":delegate.display,"ptype":"publisher","request":"join","room":delegate.roomId]
-            ] as [String : Any]
+        return ["janus": "message", "transaction": transaction, "session_id": delegate.session_id, "handle_id": handle_id, "body": ["display": delegate.display, "ptype": "publisher", "request": "join", "room": delegate.roomId]] as [String: Any]
     }
 }
 
-
-class JoinForSubscriberCommand:BaseCommand
-{
+class JoinForSubscriberCommand: BaseCommand {
     override func receive(strData: String) {
         do {
-            if strData.contains("event")
-            {
-                let data:JoinOfferData = try JSONDecoder().decode(JoinOfferData.self, from: strData.data(using: .utf8)!)
+            if strData.contains("event") {
+                let data: JoinOfferData = try JSONDecoder().decode(JoinOfferData.self, from: strData.data(using: .utf8)!)
                 let id = String(data.plugindata.data.id)
-        
+                
                 delegate.client?.startConnection(id, localStream: false)
                 delegate.client?.createAnswerForOfferReceived(id, withRemoteSDP: data.jsep.sdp)
             }
-        }catch let error {
+        } catch {
             print("error converting to json on JoinForSubscriberCommand: \(error)")
         }
     }
     
-    override func getDataObject() -> [String : Any] {
-
-        let pData:AttachId = preData as! AttachId
+    override func getDataObject() -> [String: Any] {
+        
+        let pData: AttachId = preData as! AttachId
         delegate.janusId_id_to_handle[String(pData.id)] = handle_id
-        return ["janus": "message", "transaction":transaction, "session_id":delegate.session_id,"handle_id":handle_id,"body":["display":"subscriber", "feed":pData.id,"private_id":delegate.private_id,"ptype":"subscriber","request":"join","room":delegate.roomId]
-            ] as [String : Any]
+        return ["janus": "message", "transaction": transaction, "session_id": delegate.session_id, "handle_id": handle_id, "body": ["display": "subscriber", "feed": pData.id, "private_id": delegate.private_id, "ptype": "subscriber", "request": "join", "room": delegate.roomId]] as [String: Any]
     }
 }
 
-class NewJoinActiveCommand:BaseCommand
-{
+class NewJoinActiveCommand: BaseCommand {
     override func receive(strData: String) {
         do {
-            if strData.contains("event")
-            {
-                let data:JoinData = try JSONDecoder().decode(JoinData.self, from: strData.data(using: .utf8)!)
+            if strData.contains("event") {
+                let data: JoinData = try JSONDecoder().decode(JoinData.self, from: strData.data(using: .utf8)!)
                 let id = data.plugindata.data.publishers[0].id
                 delegate.info_from_janusId[id] = data.plugindata.data.publishers[0]
                 delegate.sendCommand(command: AttachCommand(delegate: delegate, handleId: 0, data: AttachId(id: id)))
             }
-        }catch let error {
+        } catch {
             print("error converting to json: \(error)")
         }
     }
     
 }
-class ReceiveUnpublishCommand:BaseCommand
-{
+
+class ReceiveUnpublishCommand: BaseCommand {
     override func receive(strData: String) {
         do {
-            if strData.contains("event")
-            {
-                let data:UnpublishData = try JSONDecoder().decode(UnpublishData.self, from: strData.data(using: .utf8)!)
+            if strData.contains("event") {
+                let data: UnpublishData = try JSONDecoder().decode(UnpublishData.self, from: strData.data(using: .utf8)!)
                 delegate.disconnectMeetingById(id: String(data.plugindata.data.unpublished))
             }
-        }catch let error {
+        } catch {
             print("error converting to json: \(error)")
         }
     }
     
 }
-public class UnpublishCommand:BaseCommand
-{
-    override public func receive(strData: String) {
-        if strData.contains("event") ,let _janusId = delegate.getJanusIdFromHandId(id: handle_id)
-        {
-            delegate.disconnectMeetingById(id:_janusId )
+
+public class UnpublishCommand: BaseCommand {
+    public override func receive(strData: String) {
+        if strData.contains("event"), let _janusId = delegate.getJanusIdFromHandId(id: handle_id) {
+            delegate.disconnectMeetingById(id: _janusId)
         }
     }
-    override func getDataObject() -> [String : Any] {
-        return ["janus": "message", "transaction":transaction, "session_id":delegate.session_id,"handle_id":handle_id,"body":["request":"unpublish"]
-            ] as [String : Any]
+    
+    override func getDataObject() -> [String: Any] {
+        return ["janus": "message", "transaction": transaction, "session_id": delegate.session_id, "handle_id": handle_id, "body": ["request": "unpublish"]] as [String: Any]
     }
 }
-//---------------------------------------------------------
 
-class ListparticipantsCommand:BaseCommand
-{
+// ---------------------------------------------------------
+
+class ListparticipantsCommand: BaseCommand {
     override func receive(strData: String) {
         do {
-            let data:JoinParticipantsData = try JSONDecoder().decode(JoinParticipantsData.self, from: strData.data(using: .utf8)!)
-            delegate.sendCommand(command: JoinParticipantCommand(delegate: delegate, handleId: handle_id,data:data))
-        }catch let error {
+            let data: JoinParticipantsData = try JSONDecoder().decode(JoinParticipantsData.self, from: strData.data(using: .utf8)!)
+            delegate.sendCommand(command: JoinParticipantCommand(delegate: delegate, handleId: handle_id, data: data))
+        } catch {
             print("error converting to json: \(error)")
         }
     }
     
-    override func getDataObject() -> [String : Any] {
-        return ["janus": "message", "transaction":transaction, "session_id":delegate.session_id,"handle_id":handle_id,"body":["request":"listparticipants","room":delegate.roomId]
-            ] as [String : Any]
+    override func getDataObject() -> [String: Any] {
+        return ["janus": "message", "transaction": transaction, "session_id": delegate.session_id, "handle_id": handle_id, "body": ["request": "listparticipants", "room": delegate.roomId]] as [String: Any]
     }
 }
 
-class JoinParticipantCommand:BaseCommand
-{
+class JoinParticipantCommand: BaseCommand {
     override func receive(strData: String) {
         do {
-            if strData.contains("event")
-            {
-                let data:JoinOfferData = try JSONDecoder().decode(JoinOfferData.self, from: strData.data(using: .utf8)!)
+            if strData.contains("event") {
+                let data: JoinOfferData = try JSONDecoder().decode(JoinOfferData.self, from: strData.data(using: .utf8)!)
                 let id = String(data.plugindata.data.id)
                 var iceServers = [RTCIceServer]()
                 //            iceServers.append(RTCIceServer(urlStrings: iceServerdata.urls, username: iceServerdata.username, credential: iceServerdata.credential))
-                iceServers.append(RTCIceServer(urlStrings:["stun:stun.l.google.com:19302"] ))
+                iceServers.append(RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"]))
                 delegate.client?.setIceServer(id, iceServers: iceServers)
                 delegate.client?.startConnection(id, localStream: false)
                 delegate.client?.createAnswerForOfferReceived(String(data.plugindata.data.id), withRemoteSDP: data.jsep.sdp)
             }
-        }catch let error {
+        } catch {
             print("error converting to json: \(error)")
         }
     }
     
-    override func getDataObject() -> [String : Any] {
-        var pData:JoinParticipantsData = preData as! JoinParticipantsData
+    override func getDataObject() -> [String: Any] {
+        var pData: JoinParticipantsData = preData as! JoinParticipantsData
         let view_id = pData.plugindata.data.participants[0].id
         delegate.janusId_id_to_handle[String(view_id)] = handle_id
-        return ["janus": "message", "transaction":transaction, "session_id":delegate.session_id,"handle_id":handle_id,"body":["feed":view_id,"private_id":0,"ptype":"subscriber","request":"join","room":delegate.roomId]
-            ] as [String : Any]
+        return ["janus": "message", "transaction": transaction, "session_id": delegate.session_id, "handle_id": handle_id, "body": ["feed": view_id, "private_id": 0, "ptype": "subscriber", "request": "join", "room": delegate.roomId]] as [String: Any]
     }
 }
 
 import WebRTC
-class SendOfferCommand:BaseCommand
-{
+class SendOfferCommand: BaseCommand {
     override func receive(strData: String) {
         do {
-            if strData.contains("event")
-            {
-                let data:OfferReturnData = try JSONDecoder().decode(OfferReturnData.self, from: strData.data(using: .utf8)!)
-                if let id = delegate.getJanusIdFromHandId(id: data.sender){
-                    delegate.client?.handleAnswerReceived(id,withRemoteSDP: data.jsep.sdp)
+            if strData.contains("event") {
+                let data: OfferReturnData = try JSONDecoder().decode(OfferReturnData.self, from: strData.data(using: .utf8)!)
+                if let id = delegate.getJanusIdFromHandId(id: data.sender) {
+                    delegate.client?.handleAnswerReceived(id, withRemoteSDP: data.jsep.sdp)
                 }
                 
             }
-        }catch let error {
+        } catch {
             print("error converting to json: \(error)")
         }
     }
     
-    override func getDataObject() -> [String : Any] {
-        let pData:JsepData = preData as! JsepData
-        return ["janus": "message", "transaction":transaction, "session_id":delegate.session_id,"handle_id":handle_id,"body":["request":"configure","audio":true,"video":true],"jsep":["type":pData.type,"sdp":pData.sdp]
-            ] as [String : Any]
+    override func getDataObject() -> [String: Any] {
+        let pData: JsepData = preData as! JsepData
+        return ["janus": "message", "transaction": transaction, "session_id": delegate.session_id, "handle_id": handle_id, "body": ["request": "configure", "audio": true, "video": true], "jsep": ["type": pData.type, "sdp": pData.sdp]] as [String: Any]
     }
 }
-class SendAnswerCommand:BaseCommand
-{
+
+class SendAnswerCommand: BaseCommand {
     
-    override func getDataObject() -> [String : Any] {
-        let pData:JsepData = preData as! JsepData
-        return ["janus": "message", "transaction":transaction, "session_id":delegate.session_id,"handle_id":handle_id,"body":["request":"start","room":delegate.roomId],"jsep":["type":"answer","sdp":pData.sdp]
-            ] as [String : Any]
+    override func getDataObject() -> [String: Any] {
+        let pData: JsepData = preData as! JsepData
+        return ["janus": "message", "transaction": transaction, "session_id": delegate.session_id, "handle_id": handle_id, "body": ["request": "start", "room": delegate.roomId], "jsep": ["type": "answer", "sdp": pData.sdp]] as [String: Any]
     }
 }
-class SendCandidateCommand:BaseCommand
-{
+
+class SendCandidateCommand: BaseCommand {
     
-    override func getDataObject() -> [String : Any] {
-        let pData:CandidateData = preData as! CandidateData
-        return ["janus": "trickle", "transaction":transaction, "session_id":delegate.session_id,"handle_id":handle_id,"candidate":["candidate":pData.candidate,"sdpMLineIndex":pData.lineIndex,"sdpMid":pData.sdpMid]
-            ] as [String : Any]
+    override func getDataObject() -> [String: Any] {
+        let pData: CandidateData = preData as! CandidateData
+        return ["janus": "trickle", "transaction": transaction, "session_id": delegate.session_id, "handle_id": handle_id, "candidate": ["candidate": pData.candidate, "sdpMLineIndex": pData.lineIndex, "sdpMid": pData.sdpMid]] as [String: Any]
     }
 }
-class SendCandidateEndCommand:BaseCommand
-{
+
+class SendCandidateEndCommand: BaseCommand {
     
-    override func getDataObject() -> [String : Any] {
-        return ["janus": "trickle", "transaction":transaction, "session_id":delegate.session_id,"handle_id":handle_id,"candidate":["completed":true]
-            ] as [String : Any]
-    }
-}
-class KeepAliveCommand:BaseCommand
-{
-
-    override func getDataObject() -> [String : Any] {
-        return ["janus": "keepalive", "transaction":transaction, "session_id":delegate.session_id] as [String : Any]
+    override func getDataObject() -> [String: Any] {
+        return ["janus": "trickle", "transaction": transaction, "session_id": delegate.session_id, "handle_id": handle_id, "candidate": ["completed": true]] as [String: Any]
     }
 }
 
-
-
-
+class KeepAliveCommand: BaseCommand {
+    
+    override func getDataObject() -> [String: Any] {
+        return ["janus": "keepalive", "transaction": transaction, "session_id": delegate.session_id] as [String: Any]
+    }
+}
