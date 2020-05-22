@@ -30,7 +30,7 @@ public class BaseCommand: CommandDelegate {
     public final func getSendData() -> String {
         var sendData = ""
         do {
-            let jsonData = try JSONSerialization.data(withJSONObject: getDataObject(), options: .prettyPrinted)
+            let jsonData = try JSONSerialization.data(withJSONObject: self.getDataObject(), options: .prettyPrinted)
             sendData = String(data: jsonData, encoding: String.Encoding.utf8)!
 //            print("sendData: \(sendData)")
         } catch {
@@ -67,7 +67,7 @@ class CreateRoomCommand: BaseCommand {
     }
     
     override func getDataObject() -> [String: Any] {
-        return ["janus": "message", "transaction": transaction, "session_id": delegate.session_id, "handle_id": handle_id, "body": ["description": "kek" ,"request": "create", "room": roomId, "is_private": false]] as [String: Any]
+        return ["janus": "message", "transaction": transaction, "session_id": delegate.session_id, "handle_id": handle_id, "body": ["description": "kek", "request": "create", "room": self.roomId, "is_private": false]] as [String: Any]
     }
     
 }
@@ -77,14 +77,12 @@ class CreateCommand: BaseCommand {
         do {
             let data: CreateData = try JSONDecoder().decode(CreateData.self, from: strData.data(using: .utf8)!)
             delegate.setSessionId(data.data.id)
-           // delegate.sendCommand(command: CreateRoomCommand(roomId: delegate.roomId, delegate: delegate, handleId: 0))
+            // delegate.sendCommand(command: CreateRoomCommand(roomId: delegate.roomId, delegate: delegate, handleId: 0))
 //           delegate.sendCommand(command: CreateRoomCommand(roomId: delegate.roomId, delegate: delegate, handleId: 0))
 //                  let deadlineTime = DispatchTime.now() + .seconds(3)
 //                             DispatchQueue.main.asyncAfter(deadline: deadlineTime) {
-                self.delegate.sendCommand(command: AttachCommand(delegate: self.delegate, handleId: 0))
+            self.delegate.sendCommand(command: AttachCommand(delegate: self.delegate, handleId: 0))
             // }
-            
-            
             
         } catch {
             print("error converting to json: \(error)")
@@ -101,20 +99,21 @@ class AttachCommand: BaseCommand {
         do {
             let data: AttachData = try JSONDecoder().decode(AttachData.self, from: strData.data(using: .utf8)!)
             handle_id = data.data.id
-            delegate.sendCommand(command: CreateRoomCommand(roomId: delegate.roomId, delegate: delegate, handleId: handle_id))
-                            let deadlineTime = DispatchTime.now() + .seconds(3)
-                                       DispatchQueue.main.asyncAfter(deadline: deadlineTime) {
-            
-                                        if self.delegate.type == .Listparticipants {
-                self.delegate.sendCommand(command: ListparticipantsCommand(delegate: self.delegate, handleId: self.handle_id))
-            } else {
-                if self.preData == nil {
-                    self.delegate.sendCommand(command: JoinForPublisherCommand(delegate: self.delegate, handleId: self.handle_id))
+            if delegate.isNewRoom {
+                delegate.sendCommand(command: CreateRoomCommand(roomId: delegate.roomId, delegate: delegate, handleId: handle_id))
+            }
+            let deadlineTime = DispatchTime.now() + .seconds(0)
+            DispatchQueue.main.asyncAfter(deadline: deadlineTime) {
+                if self.delegate.type == .Listparticipants {
+                    self.delegate.sendCommand(command: ListparticipantsCommand(delegate: self.delegate, handleId: self.handle_id))
                 } else {
-                    self.delegate.sendCommand(command: JoinForSubscriberCommand(delegate: self.delegate, handleId: self.handle_id, data: self.preData))
+                    if self.preData == nil {
+                        self.delegate.sendCommand(command: JoinForPublisherCommand(delegate: self.delegate, handleId: self.handle_id))
+                    } else {
+                        self.delegate.sendCommand(command: JoinForSubscriberCommand(delegate: self.delegate, handleId: self.handle_id, data: self.preData))
+                    }
                 }
             }
-        }
         } catch {
             print("error converting to json: \(error)")
         }
