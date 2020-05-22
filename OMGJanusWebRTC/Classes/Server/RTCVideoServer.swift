@@ -119,8 +119,9 @@ public class RTCVideoServer: WebSocketDelegate, OMGRTCServerDelegate {
         print("[websocket connected]")
         janusId_id_to_handle = [:]
         info_from_janusId = [:]
+       
+                    self.sendCommand(command: CreateCommand(delegate: self, handleId: 0))
         
-        sendCommand(command: CreateCommand(delegate: self, handleId: 0))
     }
     
     public func websocketDidDisconnect(socket: WebSocketClient, error: Error?) {
