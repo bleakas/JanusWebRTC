@@ -46,7 +46,15 @@ class ViewController: UIViewController ,OMGRTCClientDelegate,RTCEAGLVideoViewDel
         
         var iceServers = [RTCIceServer]()
         //            iceServers.append(RTCIceServer(urlStrings: iceServerdata.urls, username: iceServerdata.username, credential: iceServerdata.credential))
-        iceServers.append(RTCIceServer(urlStrings:["stun:stun.l.google.com:19302"] ))
+        iceServers.append(RTCIceServer(urlStrings:["stun:69.30.225.195:3478"], username: "bleakas", credential: "dajtpd" ))
+        iceServers.append(RTCIceServer(urlStrings: ["turn:69.30.225.195:3478?transport=udp"], username: "bleakas", credential: "dajtpd"))
+//        iceServers.append(RTCIceServer(urlStrings:["stun:us-turn4.xirsys.com"]))
+//               iceServers.append(RTCIceServer(urlStrings: [ "turn:us-turn4.xirsys.com:80?transport=udp",
+//                     "turn:us-turn4.xirsys.com:3478?transport=udp",
+//                     "turn:us-turn4.xirsys.com:80?transport=tcp",
+//                     "turn:us-turn4.xirsys.com:3478?transport=tcp",
+//                     "turns:us-turn4.xirsys.com:443?transport=tcp",
+//                     "turns:us-turn4.xirsys.com:5349?transport=tcp"], username: "KMEy-VTAukFCxTjhQwXp0q0HncJgaPR1RlBpRCQYGl-gfHYnEJEPtgL18VbSq3s3AAAAAF7KhI5ibGVha2Fz", credential: "d737cbc6-9dca-11ea-816a-0242ac140004"))
         let n = Int(arc4random_uniform(11142))
         let myId = String(n)
         rtcManager = RTCClient(videoCall: true)
@@ -56,7 +64,7 @@ class ViewController: UIViewController ,OMGRTCClientDelegate,RTCEAGLVideoViewDel
 //        clientServer?.initPublish = false
         rtcOperator = WebRTCOperator(delegate: self,omgSocket: clientServer!)
         rtcManager?.delegate = rtcOperator
-        clientServer?.registerMeetRoom(999)
+        clientServer?.registerMeetRoom(1234)
         
         
         

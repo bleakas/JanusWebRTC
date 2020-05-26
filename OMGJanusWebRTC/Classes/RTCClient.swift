@@ -138,6 +138,7 @@ public class RTCClient: NSObject {
         }
         self.peerConnections.removeAll()
         self.remoteIceCandidates.removeAll()
+        RTCClient.mainStream = nil
     }
 
     public func getConnectActiveNum() -> Int {
